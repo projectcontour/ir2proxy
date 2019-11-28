@@ -35,7 +35,7 @@ func main() {
 	}
 
 	contourscheme.AddToScheme(scheme.Scheme)
-
+	// This doesn't currently work with multiple objects in the one file.
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 
 	ir, groupVersionKind, err := decode(data, nil, nil)
@@ -44,8 +44,6 @@ func main() {
 	}
 	switch t := ir.(type) {
 	case *irv1beta1.IngressRoute:
-		log.Info("This was an IngressRoute")
-		//log.Infof("%#v", t)
 		log.Infof("IngressRoute %s, namespace %s", t.ObjectMeta.Name, t.ObjectMeta.Namespace)
 	default:
 		log.Infof("This utility only works with IngressRoute, a %s was supplied.", groupVersionKind)
