@@ -2,70 +2,73 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 
-	"github.com/davecgh/go-spew/spew"
-	irv1beta1 "github.com/projectcontour/contour/apis/contour/v1beta1"
-	contourscheme "github.com/projectcontour/contour/apis/generated/clientset/versioned/scheme"
-	hpv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
+	"github.com/ghodss/yaml"
+
+	"github.com/projectcontour/ir2proxy/internal/k8sdecoder"
+	"github.com/projectcontour/ir2proxy/internal/translate"
+	"github.com/projectcontour/ir2proxy/internal/validate"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func main() {
+
+	exitcode := run()
+	os.Exit(exitcode)
+
+}
+
+func run() int {
+
 	log := logrus.StandardLogger()
 	app := kingpin.New("ir2proxy", "Contour IngressRoute to HTTPPRoxy conversion tool.")
 
-	yamlfile := app.Arg("yaml", "YAML file to parse for IngressRoute objects").Required().String()
+	yamlfile := app.Arg("yaml", "YAML file to parse for IngressRoute objects").Required().ExistingFile()
 
 	args := os.Args[1:]
-	//kingpin.MustParse(app.Parse(args))
-	app.Parse(args)
-
-	if *yamlfile == "" {
-		app.FatalUsage("Need a YAML file to operate on.")
-	}
-
-	if !verifyYAMLFile(*yamlfile) {
-		log.Fatalf("File %s does not exist", *yamlfile)
-	}
+	kingpin.MustParse(app.Parse(args))
 
 	data, err := ioutil.ReadFile(*yamlfile)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return 1
 	}
 
-	contourscheme.AddToScheme(scheme.Scheme)
-
-	for _, yamldoc := range bytes.Split(data, []byte("---")) {
-		if len(yamldoc) == 0 {
-			continue
-		}
-
-		decode := scheme.Codecs.UniversalDeserializer().Decode
-
-		ir, groupVersionKind, err := decode(yamldoc, nil, nil)
+	for _, yamldoc := range splitYAML(data) {
+		ir, err := k8sdecoder.DecodeIngressRoute(yamldoc)
 		if err != nil {
-			log.Infof("Skipped yaml doc, %s", err)
-			continue
-		}
-		switch t := ir.(type) {
-		case *irv1beta1.IngressRoute:
-			log.Infof("IngressRoute %s, namespace %s, labels %s", t.ObjectMeta.Name, t.ObjectMeta.Namespace, t.ObjectMeta.Labels)
-			hp, err := translateIngressRouteToHTTPProxy(t)
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Error(spew.Sdump(hp))
-		default:
-			log.Errorf("This utility only works with IngressRoute, a %s was supplied.", groupVersionKind)
+			log.Error(err)
+			return 1
 		}
 
+		validationErrors := validate.CheckIngressRoute(ir)
+		if len(validationErrors) > 0 {
+			for _, validationError := range validationErrors {
+				log.Error(validationError)
+			}
+			return 1
+		}
+
+		hp, translationErrors := translate.IngressRouteToHTTPProxy(ir)
+		if len(translationErrors) > 0 {
+			for _, translationError := range translationErrors {
+				log.Error(translationError)
+			}
+			return 1
+		}
+		outputYAML, err := yaml.Marshal(hp)
+		if err != nil {
+			log.Warn(err)
+			return 1
+		}
+		fmt.Printf("---\n%s", outputYAML)
 	}
 
+	return 0
 }
 
 func verifyYAMLFile(filename string) bool {
@@ -77,20 +80,15 @@ func verifyYAMLFile(filename string) bool {
 
 }
 
-func translateIngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (hp *hpv1.HTTPProxy, err error) {
+func splitYAML(yamldata []byte) [][]byte {
 
-	hp = &hpv1.HTTPProxy{
-		ObjectMeta: v1.ObjectMeta{
-			Name:        ir.ObjectMeta.Name,
-			Namespace:   ir.ObjectMeta.Namespace,
-			Labels:      ir.ObjectMeta.DeepCopy().GetLabels(),
-			Annotations: ir.ObjectMeta.DeepCopy().GetAnnotations(),
-		},
+	var yamldocs [][]byte
+	for _, yamldoc := range bytes.Split(yamldata, []byte("---")) {
+		if len(yamldoc) == 0 {
+			continue
+		}
+		yamldocs = append(yamldocs, yamldoc)
 	}
+	return yamldocs
 
-	if ir.Spec.VirtualHost != nil {
-		hp.Spec.VirtualHost = ir.Spec.VirtualHost
-	}
-
-	return hp, err
 }
