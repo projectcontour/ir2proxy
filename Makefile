@@ -35,10 +35,10 @@ check: install $(Check_Targets) ## Run tests and CI checks
 pedantic: check check-errcheck ## Run pedantic CI checks
 
 install: ## Build and install the contour binary
-	go install -mod=readonly -v -tags "oidc gcp" $(MODULE)/cmd/$(PROJECT)
+	go install -mod=readonly -v $(MODULE)/cmd/$(PROJECT)
 
 race:
-	go install -mod=readonly -v -race -tags "oidc gcp" $(MODULE)/cmd/$(PROJECT)
+	go install -mod=readonly -v $(MODULE)/cmd/$(PROJECT)
 
 download: ## Download Go modules
 	go mod download
