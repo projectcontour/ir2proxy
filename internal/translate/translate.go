@@ -15,6 +15,8 @@
 package translate
 
 import (
+	"fmt"
+
 	irv1beta1 "github.com/projectcontour/contour/apis/contour/v1beta1"
 	hpv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +24,11 @@ import (
 
 // IngressRouteToHTTPProxy translates IngressRoute objects to HTTPProxy ones, emitting warnings
 // as it goes.
+// There are four outcomes:
+// - IngressRoute translates, no warnings == defined httpproxy, empty []string
+// - IngressRoute translates, warnings == defined httpproxy, nonempty []string
+// - IngressRoute does not translate, warnings == nil, nonempty []string
+// - IngressRoute does not translate, no warnings == shouldn't happen, only for building tests.
 func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []string) {
 
 	var warnings []string
@@ -42,12 +49,75 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 		},
 	}
 
-	if ir.Spec.VirtualHost == nil && ir.Spec.TCPProxy == nil && len(ir.Spec.Routes) == 0 {
-		warnings = append(warnings, "Ingress %s is empty. Not much to convert.", ir.ObjectMeta.Name)
+	// TODO(youngnick): Investigate if we should skip logically empty IngressRoutes
+
+	hp.Spec.VirtualHost = ir.Spec.VirtualHost
+	hpRoutes, hpWarnings := translateRoutes(ir.Spec.Routes)
+	hp.Spec.Routes = hpRoutes
+	warnings = append(warnings, hpWarnings...)
+	return hp, warnings
+}
+
+func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
+	var warnings []string
+
+	hpRoute := hpv1.Route{
+		Conditions: []hpv1.Condition{
+			hpv1.Condition{
+				Prefix: irRoute.Match,
+			},
+		},
 	}
-	if ir.Spec.VirtualHost != nil {
-		hp.Spec.VirtualHost = ir.Spec.VirtualHost
+	if irRoute.TimeoutPolicy != nil {
+		hpRoute.TimeoutPolicy = &hpv1.TimeoutPolicy{
+			Response: irRoute.TimeoutPolicy.Request,
+		}
+	}
+	for _, irService := range irRoute.Services {
+		var seenLBStrategy string
+
+		hpService := hpv1.Service{
+			Name:   irService.Name,
+			Port:   irService.Port,
+			Weight: irService.Weight,
+		}
+		if irService.Strategy != "" {
+			if seenLBStrategy == "" {
+				// Copy the first strategy we encounter into the HP loadbalancerpolicy
+				// and save that we've seen that one.
+				hpRoute.LoadBalancerPolicy = &hpv1.LoadBalancerPolicy{
+					Strategy: irService.Strategy,
+				}
+				seenLBStrategy = irService.Strategy
+			} else {
+				warnings = append(warnings, fmt.Sprintf("Strategy %s on Service %s could not be applied, HTTPProxy only supports a single load balancing policy across all services. %s is already applied.", irService.Strategy, irService.Name, seenLBStrategy))
+			}
+
+		}
+		if irService.HealthCheck != nil {
+			hpRoute.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
+				Path:                    irService.HealthCheck.Path,
+				Host:                    irService.HealthCheck.Host,
+				TimeoutSeconds:          irService.HealthCheck.TimeoutSeconds,
+				UnhealthyThresholdCount: irService.HealthCheck.UnhealthyThresholdCount,
+				HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
+			}
+		}
+		hpRoute.Services = append(hpRoute.Services, hpService)
 	}
 
-	return hp, warnings
+	return hpRoute, warnings
+}
+
+func translateRoutes(irRoutes []irv1beta1.Route) ([]hpv1.Route, []string) {
+
+	var hpRoutes []hpv1.Route
+	var warnings []string
+	for _, irRoute := range irRoutes {
+		hpRoute, routeWarnings := translateRoute(irRoute)
+		hpRoutes = append(hpRoutes, hpRoute)
+		warnings = append(warnings, routeWarnings...)
+	}
+
+	return hpRoutes, warnings
 }

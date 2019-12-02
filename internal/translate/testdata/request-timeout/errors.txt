@@ -1,0 +1,1 @@
+request-timeout contains a Route with timeout policy set, the Request timeout field has been renamed to Response in HTTPProxy's timeoutPolicy.

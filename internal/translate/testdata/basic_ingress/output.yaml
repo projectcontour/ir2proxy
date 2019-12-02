@@ -1,0 +1,18 @@
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  creationTimestamp: null
+  name: basic
+  namespace: default
+spec:
+  routes:
+  - conditions:
+    - prefix: /
+    services:
+    - name: s1
+      port: 80
+  virtualhost:
+    fqdn: foo-basic.bar.com
+status:
+  currentStatus: ""
+  description: ""
