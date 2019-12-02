@@ -55,11 +55,19 @@ func run() int {
 
 		hp, translationErrors := translate.IngressRouteToHTTPProxy(ir)
 		if len(translationErrors) > 0 {
-			for _, translationError := range translationErrors {
-				log.Error(translationError)
+			if hp == nil {
+				// If we didn't get a HTTPProxy back, then there was at least
+				// one fatal error. Log them and exit.
+				for _, translationError := range translationErrors {
+					log.Error(translationError)
+				}
+				return 1
 			}
-			return 1
+			for _, translationError := range translationErrors {
+				log.Warn(translationError)
+			}
 		}
+
 		outputYAML, err := yaml.Marshal(hp)
 		if err != nil {
 			log.Warn(err)
