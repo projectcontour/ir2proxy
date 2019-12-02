@@ -26,9 +26,7 @@ Check_Targets := \
 	check-misspell \
 	check-unconvert \
 	check-ineffassign \
-#	check-unparam \
-# TODO(youngnick): Reenable check-unparam once translate.go contains actual error checking.
-# It's currently only a skeleton.
+	check-unparam \
 
 .PHONY: check
 check: install $(Check_Targets) ## Run tests and CI checks

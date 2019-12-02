@@ -42,6 +42,9 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 		},
 	}
 
+	if ir.Spec.VirtualHost == nil && ir.Spec.TCPProxy == nil && len(ir.Spec.Routes) == 0 {
+		warnings = append(warnings, "Ingress %s is empty. Not much to convert.", ir.ObjectMeta.Name)
+	}
 	if ir.Spec.VirtualHost != nil {
 		hp.Spec.VirtualHost = ir.Spec.VirtualHost
 	}

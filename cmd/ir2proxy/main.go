@@ -71,15 +71,6 @@ func run() int {
 	return 0
 }
 
-func verifyYAMLFile(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-
-}
-
 func splitYAML(yamldata []byte) [][]byte {
 
 	var yamldocs [][]byte
