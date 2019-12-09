@@ -15,6 +15,7 @@
 package translator
 
 import (
+	"errors"
 	"fmt"
 
 	irv1beta1 "github.com/projectcontour/contour/apis/contour/v1beta1"
@@ -26,9 +27,17 @@ import (
 // as it goes.
 // There are currently no fatal conditions (that should not produces a HTTPProxy output)
 // TODO(youngnick) - change this signature to return HTTPProxy, []string, error if we need that.
-func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []string) {
+func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []string, error) {
 
 	var warnings []string
+	// TODO(youngnick): Investigate if we should skip logically empty IngressRoutes
+
+	if ir.Spec.VirtualHost == nil {
+		return nil, warnings, errors.New("unimplemented: Can't translate non-root IngressRoutes yet")
+	}
+
+	hpRoutes, hpIncludes, hpWarnings := translateRoutes(ir.Spec.Routes)
+
 	hp := &hpv1.HTTPProxy{
 		TypeMeta: v1.TypeMeta{
 			Kind:       "HTTPProxy",
@@ -44,15 +53,15 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 			Labels:      ir.ObjectMeta.DeepCopy().GetLabels(),
 			Annotations: ir.ObjectMeta.DeepCopy().GetAnnotations(),
 		},
+		Spec: hpv1.HTTPProxySpec{
+			VirtualHost: ir.Spec.VirtualHost,
+		},
 	}
 
-	// TODO(youngnick): Investigate if we should skip logically empty IngressRoutes
-
-	hp.Spec.VirtualHost = ir.Spec.VirtualHost
-	hpRoutes, hpWarnings := translateRoutes(ir.Spec.Routes)
 	hp.Spec.Routes = hpRoutes
+	hp.Spec.Includes = hpIncludes
 	warnings = append(warnings, hpWarnings...)
-	return hp, warnings
+	return hp, warnings, nil
 }
 
 func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
@@ -65,6 +74,7 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 			},
 		},
 	}
+
 	if irRoute.TimeoutPolicy != nil {
 		hpRoute.TimeoutPolicy = &hpv1.TimeoutPolicy{
 			Response: irRoute.TimeoutPolicy.Request,
@@ -109,15 +119,40 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 	return hpRoute, warnings
 }
 
-func translateRoutes(irRoutes []irv1beta1.Route) ([]hpv1.Route, []string) {
+func translateInclude(irRoute irv1beta1.Route) *hpv1.Include {
+	var hpInclude *hpv1.Include
+
+	if irRoute.Delegate != nil {
+		// If there's a delegation, short-circuit.
+		hpInclude = &hpv1.Include{
+			Conditions: []hpv1.Condition{
+				hpv1.Condition{
+					Prefix: irRoute.Match,
+				},
+			},
+			Name:      irRoute.Delegate.Name,
+			Namespace: irRoute.Delegate.Namespace,
+		}
+	}
+
+	return hpInclude
+}
+
+func translateRoutes(irRoutes []irv1beta1.Route) ([]hpv1.Route, []hpv1.Include, []string) {
 
 	var hpRoutes []hpv1.Route
+	var hpIncludes []hpv1.Include
 	var warnings []string
 	for _, irRoute := range irRoutes {
+		hpInclude := translateInclude(irRoute)
+		if hpInclude != nil {
+			hpIncludes = append(hpIncludes, *hpInclude)
+			continue
+		}
 		hpRoute, routeWarnings := translateRoute(irRoute)
 		hpRoutes = append(hpRoutes, hpRoute)
 		warnings = append(warnings, routeWarnings...)
 	}
 
-	return hpRoutes, warnings
+	return hpRoutes, hpIncludes, warnings
 }

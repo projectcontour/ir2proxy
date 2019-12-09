@@ -21,8 +21,6 @@ type testFixture struct {
 	warnings []string
 }
 
-// In this test, we're testing six conditions:
-// IngressRoute cannot be translated, there are warnings,
 func TestTranslateIngressRoute(t *testing.T) {
 	for name, tc := range buildFixtureSet(t) {
 		t.Run(name, func(t *testing.T) {
@@ -31,7 +29,17 @@ func TestTranslateIngressRoute(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			hp, warnings := IngressRouteToHTTPProxy(ir)
+			hp, warnings, err := IngressRouteToHTTPProxy(ir)
+			if err != nil {
+				// Can't translate the IngressRoute at all
+				// errors.txt should have the error message.
+				errorDiff := cmp.Diff([]string{err.Error()}, tc.warnings)
+				if errorDiff != "" {
+					t.Fatalf("Unexpected translation failure:\n%v", errorDiff)
+				}
+				// Errors match, pass.
+				return
+			}
 			outputYAML, err := yaml.Marshal(hp)
 			if err != nil {
 				t.Fatal(err)
@@ -66,6 +74,42 @@ func TestTranslateIngressRoute(t *testing.T) {
 
 		})
 	}
+}
+
+func TestTranslateIngressRouteErrors(t *testing.T) {
+
+	nonrootIngressRoute := []byte(`
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata: 
+  name: nonroot
+  namespace: default
+spec: 
+  routes: 
+  - match: /
+    services: 
+    - name: s2
+      port: 80
+`)
+
+	fatalError := []string{"unimplemented: Can't translate non-root IngressRoutes yet"}
+
+	ir, err := k8sdecoder.DecodeIngressRoute(nonrootIngressRoute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = IngressRouteToHTTPProxy(ir)
+	if err != nil {
+		// Can't translate the IngressRoute at all
+		// errors.txt should have the error message.
+		errorDiff := cmp.Diff([]string{err.Error()}, fatalError)
+		if errorDiff != "" {
+			t.Fatalf("Unexpected translation failure:\n%v", errorDiff)
+		}
+		// Errors match, pass.
+		return
+	}
+
 }
 
 func buildFixtureSet(t *testing.T) map[string]testFixture {
