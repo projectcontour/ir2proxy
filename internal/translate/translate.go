@@ -24,11 +24,8 @@ import (
 
 // IngressRouteToHTTPProxy translates IngressRoute objects to HTTPProxy ones, emitting warnings
 // as it goes.
-// There are four outcomes:
-// - IngressRoute translates, no warnings == defined httpproxy, empty []string
-// - IngressRoute translates, warnings == defined httpproxy, nonempty []string
-// - IngressRoute does not translate, warnings == nil, nonempty []string
-// - IngressRoute does not translate, no warnings == shouldn't happen, only for building tests.
+// There are currently no fatal conditions (that should not produces a HTTPProxy output)
+// TODO(youngnick) - change this signature to return HTTPProxy, []string, error if we need that.
 func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []string) {
 
 	var warnings []string
@@ -73,24 +70,27 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 			Response: irRoute.TimeoutPolicy.Request,
 		}
 	}
+	var seenLBStrategy string
 	for _, irService := range irRoute.Services {
-		var seenLBStrategy string
 
 		hpService := hpv1.Service{
 			Name:   irService.Name,
 			Port:   irService.Port,
 			Weight: irService.Weight,
 		}
+
 		if irService.Strategy != "" {
 			if seenLBStrategy == "" {
+				seenLBStrategy = irService.Strategy
 				// Copy the first strategy we encounter into the HP loadbalancerpolicy
 				// and save that we've seen that one.
 				hpRoute.LoadBalancerPolicy = &hpv1.LoadBalancerPolicy{
 					Strategy: irService.Strategy,
 				}
-				seenLBStrategy = irService.Strategy
 			} else {
-				warnings = append(warnings, fmt.Sprintf("Strategy %s on Service %s could not be applied, HTTPProxy only supports a single load balancing policy across all services. %s is already applied.", irService.Strategy, irService.Name, seenLBStrategy))
+				if seenLBStrategy != irService.Strategy {
+					warnings = append(warnings, fmt.Sprintf("Strategy %s on Service %s could not be applied, HTTPProxy only supports a single load balancing policy across all services. %s is already applied.", irService.Strategy, irService.Name, seenLBStrategy))
+				}
 			}
 
 		}

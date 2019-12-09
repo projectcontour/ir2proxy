@@ -9,7 +9,7 @@ spec:
   - conditions:
     - prefix: /
     loadBalancerPolicy:
-      strategy: WeightedLeastRequest
+      strategy: Random
     services:
     - name: s1-strategy
       port: 80

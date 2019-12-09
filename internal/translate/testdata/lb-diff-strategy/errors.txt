@@ -1,0 +1,1 @@
+Strategy WeightedLeastRequest on Service s2-strategy could not be applied, HTTPProxy only supports a single load balancing policy across all services. Random is already applied.
