@@ -2,7 +2,6 @@
 apiVersion: projectcontour.io/v1
 kind: HTTPProxy
 metadata:
-  creationTimestamp: null
   name: delegation-root
   namespace: default
 spec:
