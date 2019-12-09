@@ -31,14 +31,7 @@ func TestTranslateIngressRoute(t *testing.T) {
 			}
 			hp, warnings, err := IngressRouteToHTTPProxy(ir)
 			if err != nil {
-				// Can't translate the IngressRoute at all
-				// errors.txt should have the error message.
-				errorDiff := cmp.Diff([]string{err.Error()}, tc.warnings)
-				if errorDiff != "" {
-					t.Fatalf("Unexpected translation failure:\n%v", errorDiff)
-				}
-				// Errors match, pass.
-				return
+				t.Fatal(err)
 			}
 			outputYAML, err := yaml.Marshal(hp)
 			if err != nil {

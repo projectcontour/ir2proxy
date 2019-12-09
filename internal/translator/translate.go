@@ -29,14 +29,13 @@ import (
 // TODO(youngnick) - change this signature to return HTTPProxy, []string, error if we need that.
 func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []string, error) {
 
-	var warnings []string
 	// TODO(youngnick): Investigate if we should skip logically empty IngressRoutes
 
 	if ir.Spec.VirtualHost == nil {
-		return nil, warnings, errors.New("unimplemented: Can't translate non-root IngressRoutes yet")
+		return nil, nil, errors.New("unimplemented: Can't translate non-root IngressRoutes yet")
 	}
 
-	hpRoutes, hpIncludes, hpWarnings := translateRoutes(ir.Spec.Routes)
+	routes, includes, warnings := translateRoutes(ir.Spec.Routes)
 
 	hp := &hpv1.HTTPProxy{
 		TypeMeta: v1.TypeMeta{
@@ -55,19 +54,18 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 		},
 		Spec: hpv1.HTTPProxySpec{
 			VirtualHost: ir.Spec.VirtualHost,
+			Routes:      routes,
+			Includes:    includes,
 		},
 	}
 
-	hp.Spec.Routes = hpRoutes
-	hp.Spec.Includes = hpIncludes
-	warnings = append(warnings, hpWarnings...)
 	return hp, warnings, nil
 }
 
 func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 	var warnings []string
 
-	hpRoute := hpv1.Route{
+	route := hpv1.Route{
 		Conditions: []hpv1.Condition{
 			hpv1.Condition{
 				Prefix: irRoute.Match,
@@ -76,14 +74,14 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 	}
 
 	if irRoute.TimeoutPolicy != nil {
-		hpRoute.TimeoutPolicy = &hpv1.TimeoutPolicy{
+		route.TimeoutPolicy = &hpv1.TimeoutPolicy{
 			Response: irRoute.TimeoutPolicy.Request,
 		}
 	}
 	var seenLBStrategy string
 	for _, irService := range irRoute.Services {
 
-		hpService := hpv1.Service{
+		service := hpv1.Service{
 			Name:   irService.Name,
 			Port:   irService.Port,
 			Weight: irService.Weight,
@@ -94,7 +92,7 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 				seenLBStrategy = irService.Strategy
 				// Copy the first strategy we encounter into the HP loadbalancerpolicy
 				// and save that we've seen that one.
-				hpRoute.LoadBalancerPolicy = &hpv1.LoadBalancerPolicy{
+				route.LoadBalancerPolicy = &hpv1.LoadBalancerPolicy{
 					Strategy: irService.Strategy,
 				}
 			} else {
@@ -105,7 +103,7 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 
 		}
 		if irService.HealthCheck != nil {
-			hpRoute.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
+			route.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
 				Path:                    irService.HealthCheck.Path,
 				Host:                    irService.HealthCheck.Host,
 				TimeoutSeconds:          irService.HealthCheck.TimeoutSeconds,
@@ -113,46 +111,44 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 				HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
 			}
 		}
-		hpRoute.Services = append(hpRoute.Services, hpService)
+		route.Services = append(route.Services, service)
 	}
 
-	return hpRoute, warnings
+	return route, warnings
 }
 
 func translateInclude(irRoute irv1beta1.Route) *hpv1.Include {
-	var hpInclude *hpv1.Include
 
-	if irRoute.Delegate != nil {
-		// If there's a delegation, short-circuit.
-		hpInclude = &hpv1.Include{
-			Conditions: []hpv1.Condition{
-				hpv1.Condition{
-					Prefix: irRoute.Match,
-				},
-			},
-			Name:      irRoute.Delegate.Name,
-			Namespace: irRoute.Delegate.Namespace,
-		}
+	if irRoute.Delegate == nil {
+		return nil
 	}
 
-	return hpInclude
+	return &hpv1.Include{
+		Conditions: []hpv1.Condition{
+			hpv1.Condition{
+				Prefix: irRoute.Match,
+			},
+		},
+		Name:      irRoute.Delegate.Name,
+		Namespace: irRoute.Delegate.Namespace,
+	}
 }
 
 func translateRoutes(irRoutes []irv1beta1.Route) ([]hpv1.Route, []hpv1.Include, []string) {
 
-	var hpRoutes []hpv1.Route
-	var hpIncludes []hpv1.Include
+	var routes []hpv1.Route
+	var includes []hpv1.Include
 	var warnings []string
 	for _, irRoute := range irRoutes {
 		hpInclude := translateInclude(irRoute)
 		if hpInclude != nil {
-			hpIncludes = append(hpIncludes, *hpInclude)
+			includes = append(includes, *hpInclude)
 			continue
 		}
-		hpRoute, routeWarnings := translateRoute(irRoute)
-		hpRoutes = append(hpRoutes, hpRoute)
-		warnings = append(warnings, routeWarnings...)
+		route, translationWarnings := translateRoute(irRoute)
+		routes = append(routes, route)
+		warnings = append(warnings, translationWarnings...)
 	}
 
-	return hpRoutes, hpIncludes, warnings
+	return routes, includes, warnings
 }
