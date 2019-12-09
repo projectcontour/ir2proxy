@@ -27,6 +27,7 @@ Check_Targets := \
 	check-unconvert \
 	check-ineffassign \
 	check-unparam \
+	check-yamllint \
 
 .PHONY: check
 check: install $(Check_Targets) ## Run tests and CI checks
@@ -95,6 +96,10 @@ check-gofmt:
 .PHONY: check-vet
 check-vet: | check-test
 	go vet $(MODULE)/...
+
+.PHONY: check-yamllint
+check-yamllint:
+	docker run --rm -ti -v $(CURDIR):/workdir giantswarm/yamllint -c /workdir/yamllintcfg.yaml internal/translator/testdata
 
 help: ## Display this help
 	@echo Contour high performance Ingress controller for Kubernetes

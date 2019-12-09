@@ -37,6 +37,7 @@ func TestTranslateIngressRoute(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			outputYAML = append([]byte("---\n"), outputYAML...)
 
 			translateDiff := cmp.Diff(bytes.TrimSpace(outputYAML), bytes.TrimSpace(tc.output))
 			if translateDiff != "" {
