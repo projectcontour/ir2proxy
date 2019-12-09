@@ -9,7 +9,7 @@ import (
 	"github.com/ghodss/yaml"
 
 	"github.com/projectcontour/ir2proxy/internal/k8sdecoder"
-	"github.com/projectcontour/ir2proxy/internal/translate"
+	"github.com/projectcontour/ir2proxy/internal/translator"
 	"github.com/projectcontour/ir2proxy/internal/validate"
 	"github.com/sirupsen/logrus"
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
@@ -53,7 +53,7 @@ func run() int {
 			return 1
 		}
 
-		hp, translationErrors := translate.IngressRouteToHTTPProxy(ir)
+		hp, translationErrors := translator.IngressRouteToHTTPProxy(ir)
 		if len(translationErrors) > 0 {
 			if hp == nil {
 				// If we didn't get a HTTPProxy back, then there was at least

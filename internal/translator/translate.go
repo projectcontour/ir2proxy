@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package translate translates IngressRoute objects to HTTPProxy ones
-package translate
+// Package translator translates IngressRoute objects to HTTPProxy ones
+package translator
 
 import (
 	"fmt"
