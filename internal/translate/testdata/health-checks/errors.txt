@@ -1,1 +1,0 @@
-Service s1-health has a healthcheck strategy set, overwriting the route-level HTTPProxy healthcheck.
