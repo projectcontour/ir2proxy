@@ -35,7 +35,6 @@ func run() int {
 	data, err := ioutil.ReadFile(*yamlfile)
 	if err != nil {
 		log.Error(err)
-		return 1
 	}
 
 	for _, yamldoc := range splitYAML(data) {
@@ -53,19 +52,13 @@ func run() int {
 			return 1
 		}
 
-		hp, translationErrors := translator.IngressRouteToHTTPProxy(ir)
-		if len(translationErrors) > 0 {
-			if hp == nil {
-				// If we didn't get a HTTPProxy back, then there was at least
-				// one fatal error. Log them and exit.
-				for _, translationError := range translationErrors {
-					log.Error(translationError)
-				}
-				return 1
-			}
-			for _, translationError := range translationErrors {
-				log.Warn(translationError)
-			}
+		hp, warnings, err := translator.IngressRouteToHTTPProxy(ir)
+		if err != nil {
+			log.Error(err)
+			return 1
+		}
+		for _, warning := range warnings {
+			log.Warn(warning)
 		}
 
 		outputYAML, err := yaml.Marshal(hp)
