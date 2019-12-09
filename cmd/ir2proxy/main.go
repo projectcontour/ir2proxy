@@ -66,6 +66,10 @@ func run() int {
 			log.Warn(err)
 			return 1
 		}
+		// The Kubernetes standard header field `currentTimestamp` serializes weirdly,
+		// so filter it out.
+		// See https://github.com/projectcontour/ir2proxy/issues/8 for more explanation here.
+		outputYAML = bytes.ReplaceAll(outputYAML, []byte("  creationTimestamp: null\n"), []byte(""))
 		fmt.Printf("---\n%s", outputYAML)
 	}
 
