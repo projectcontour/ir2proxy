@@ -1,3 +1,4 @@
+---
 apiVersion: projectcontour.io/v1
 kind: HTTPProxy
 metadata:
@@ -18,4 +19,3 @@ spec:
 status:
   currentStatus: ""
   description: ""
-  

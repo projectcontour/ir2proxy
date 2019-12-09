@@ -1,15 +1,15 @@
 ---
 apiVersion: contour.heptio.com/v1beta1
 kind: IngressRoute
-metadata: 
+metadata:
   name: weight-shifting
   namespace: default
-spec: 
+spec:
   virtualhost:
     fqdn: weights.bar.com
-  routes: 
+  routes:
     - match: /
-      services: 
+      services:
         - name: s1
           port: 80
           weight: 10

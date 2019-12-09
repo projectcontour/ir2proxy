@@ -1,18 +1,18 @@
 ---
 apiVersion: contour.heptio.com/v1beta1
 kind: IngressRoute
-metadata: 
+metadata:
   name: lb-strategy
   namespace: default
-spec: 
+spec:
   virtualhost:
     fqdn: strategy.bar.com
-  routes: 
+  routes:
     - match: /
-      services: 
+      services:
         - name: s1-strategy
           port: 80
           strategy: Random
         - name: s2-strategy
           port: 80
-          strategy: WeightedLeastRequest  # Default LB Algorithm for this Service is overridden
+          strategy: WeightedLeastRequest

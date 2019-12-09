@@ -1,17 +1,17 @@
 ---
 apiVersion: contour.heptio.com/v1beta1
 kind: IngressRoute
-metadata: 
+metadata:
   name: delegation-root
   namespace: default
-spec: 
+spec:
   virtualhost:
     fqdn: root.bar.com
-  routes: 
+  routes:
     - match: /
-      services: 
+      services:
         - name: s1
           port: 80
-    - match: /service2  # delegate the subpath, `/service2` to the IngressRoute object in this namespace with the name `service2`
+    - match: /service2
       delegate:
         name: service2

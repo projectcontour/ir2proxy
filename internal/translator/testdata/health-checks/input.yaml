@@ -1,15 +1,15 @@
 ---
 apiVersion: contour.heptio.com/v1beta1
 kind: IngressRoute
-metadata: 
+metadata:
   name: health-check
   namespace: default
-spec: 
+spec:
   virtualhost:
     fqdn: health.bar.com
-  routes: 
+  routes:
     - match: /
-      services: 
+      services:
         - name: s1-health
           port: 80
           healthCheck:
@@ -18,5 +18,5 @@ spec:
             timeoutSeconds: 2
             unhealthyThresholdCount: 3
             healthyThresholdCount: 5
-        - name: s2-health  # no health-check defined for this service
+        - name: s2-health
           port: 80
