@@ -21,6 +21,4 @@ spec:
       port: 80
   virtualhost:
     fqdn: health.bar.com
-status:
-  currentStatus: ""
-  description: ""
+status: {}

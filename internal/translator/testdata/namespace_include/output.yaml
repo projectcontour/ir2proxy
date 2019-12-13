@@ -18,6 +18,4 @@ spec:
       port: 80
   virtualhost:
     fqdn: root.bar.com
-status:
-  currentStatus: ""
-  description: ""
+status: {}
