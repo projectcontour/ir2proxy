@@ -15,6 +15,4 @@ spec:
     fqdn: foo2.bar.com
     tls:
       secretName: testsecret
-status:
-  currentStatus: ""
-  description: ""
+status: {}

@@ -12,10 +12,7 @@ spec:
     - name: s1
       port: 80
     timeoutPolicy:
-      idle: ""
       response: 1s
   virtualhost:
     fqdn: timeout.bar.com
-status:
-  currentStatus: ""
-  description: ""
+status: {}
