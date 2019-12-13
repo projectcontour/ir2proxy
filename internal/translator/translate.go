@@ -47,6 +47,7 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 			// is output as 'null' by the JSON/YAML serializer, even though it's set to 'omitempty'.
 			// ¯\_(ツ)_/¯
 			// Doesn't stop the objects being applied, but it is weird.
+			// This field is filtered out of the marshaled YAML before it's output.
 			Name:        ir.ObjectMeta.Name,
 			Namespace:   ir.ObjectMeta.Namespace,
 			Labels:      ir.ObjectMeta.DeepCopy().GetLabels(),
@@ -78,6 +79,17 @@ func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
 			Response: irRoute.TimeoutPolicy.Request,
 		}
 	}
+
+	if irRoute.PrefixRewrite != "" {
+		route.PathRewrite = &hpv1.PathRewritePolicy{
+			ReplacePrefix: []hpv1.ReplacePrefix{
+				hpv1.ReplacePrefix{
+					Replacement: irRoute.PrefixRewrite,
+				},
+			},
+		}
+	}
+
 	var seenLBStrategy string
 	for _, irService := range irRoute.Services {
 

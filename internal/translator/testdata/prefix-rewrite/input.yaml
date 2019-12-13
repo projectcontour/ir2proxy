@@ -1,0 +1,19 @@
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: app
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: app.example.com
+  routes:
+    - match: /
+      services:
+        - name: app
+          port: 80
+    - match: /service2
+      prefixRewrite: "/"
+      services:
+        - name: app-service
+          port: 80
