@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+mkdir -p internal/$1/testdata/$2
+touch internal/$1/testdata/$2/input.yaml
+touch internal/$1/testdata/$2/output.yaml
+touch internal/$1/testdata/$2/errors.txt
+

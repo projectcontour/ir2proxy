@@ -1,0 +1,12 @@
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: nonroot-ambiguous-match
+  namespace: default
+spec:
+  routes:
+    - match: /foo/bar
+      services:
+        - name: s1
+          port: 80

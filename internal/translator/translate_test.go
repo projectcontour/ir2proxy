@@ -51,11 +51,11 @@ func TestTranslateIngressRoute(t *testing.T) {
 					errorsDiff := cmp.Diff(warnings, tc.warnings)
 					if errorsDiff != "" {
 						// Translation failed, and the error wasn't what we expected.
-						t.Fatalf("\nTranslation failure:\n%v\nTranslation Errors Mismatch:\n%v", translateDiff, errorsDiff)
+						t.Fatalf("\nTranslation failure:\n%v\nTranslation Warnings Mismatch:\n%v", translateDiff, errorsDiff)
 					}
 				}
 				// Translation failed, we're not supposed to get any errors, log any errors we got in case.
-				t.Fatalf("\nUnexpected translation failure:\n%v, Errors:\n%v", translateDiff, warnings)
+				t.Fatalf("\nUnexpected translation failure:\n%v, Warnings:\n%v", translateDiff, warnings)
 
 			}
 
@@ -76,36 +76,70 @@ func TestTranslateIngressRoute(t *testing.T) {
 
 func TestTranslateIngressRouteErrors(t *testing.T) {
 
-	nonrootIngressRoute := []byte(`
+	tests := map[string]struct {
+		input []byte
+		want  []string
+	}{
+		"nonroot IR, multiple invalid paths": {
+			input: []byte(`
+---
 apiVersion: contour.heptio.com/v1beta1
 kind: IngressRoute
-metadata: 
-  name: nonroot
+metadata:
+  name: nonroot-invalid-badpaths
   namespace: default
-spec: 
-  routes: 
-  - match: /
-    services: 
-    - name: s2
-      port: 80
-`)
-
-	fatalError := []string{"unimplemented: Can't translate non-root IngressRoutes yet"}
-
-	ir, err := k8sdecoder.DecodeIngressRoute(nonrootIngressRoute)
-	if err != nil {
-		t.Fatal(err)
+spec:
+  routes:
+    - match: foo
+      services:
+        - name: s1
+          port: 80
+    - match: bar
+      services:
+        - name: s2
+          port: 80
+`),
+			want: []string{"invalid IngressRoute: match clauses must share a common prefix"},
+		},
+		"nonroot IR, multiple nonmatching prefixes": {
+			input: []byte(`
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: nonroot-invalid-badpaths
+  namespace: default
+spec:
+  routes:
+    - match: /foo
+      services:
+        - name: s1
+          port: 80
+    - match: /bar
+      services:
+        - name: s2
+          port: 80
+`),
+			want: []string{"invalid IngressRoute: match clauses must share a common prefix"},
+		},
 	}
-	_, _, err = IngressRouteToHTTPProxy(ir)
-	if err != nil {
-		// Can't translate the IngressRoute at all
-		// errors.txt should have the error message.
-		errorDiff := cmp.Diff([]string{err.Error()}, fatalError)
-		if errorDiff != "" {
-			t.Fatalf("Unexpected translation failure:\n%v", errorDiff)
-		}
-		// Errors match, pass.
-		return
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ir, err := k8sdecoder.DecodeIngressRoute(tc.input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _, err = IngressRouteToHTTPProxy(ir)
+			if err != nil {
+				// Can't translate the IngressRoute at all
+				// errors.txt should have the error message.
+				errorDiff := cmp.Diff([]string{err.Error()}, tc.want)
+				if errorDiff != "" {
+					t.Fatalf("Expected translation error not encountered:\n%v", errorDiff)
+				}
+			}
+		})
 	}
 
 }
@@ -157,4 +191,66 @@ func buildFixtureSet(t *testing.T) map[string]testFixture {
 
 	return fixtures
 
+}
+
+func TestLongestCommonPathPrefix(t *testing.T) {
+
+	tests := map[string]struct {
+		input []string
+		want  string
+	}{
+		"nil": {
+			input: nil,
+			want:  "",
+		},
+		"single empty string": {
+			input: []string{""},
+			want:  "",
+		},
+		"single slash": {
+			input: []string{"/"},
+			want:  "",
+		},
+		"single entry": {
+			input: []string{"/foo"},
+			want:  "/foo",
+		},
+		"two different no common prefix": {
+			input: []string{"/foo", "/bar"},
+			want:  "",
+		},
+		"two full match": {
+			input: []string{"/foo", "/foo"},
+			want:  "/foo",
+		},
+		"two with shared prefix": {
+			input: []string{"/foo/bar", "/foo/baz"},
+			want:  "/foo",
+		},
+		"three full match": {
+			input: []string{"/foo", "/foo", "/foo"},
+			want:  "/foo",
+		},
+		"three, two components shared": {
+			input: []string{"/foo/bar/baz", "/foo/bar/quux", "/foo/bar/bar"},
+			want:  "/foo/bar",
+		},
+		"three, all different": {
+			input: []string{"/foo", "/bar", "/baz"},
+			want:  "",
+		},
+		"first is longest": {
+			input: []string{"/long/path/first", "/long"},
+			want:  "/long",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := longestCommonPathPrefix(tc.input)
+			if got != tc.want {
+				t.Fatalf("expected: '%v', got '%v'", tc.want, got)
+			}
+		})
+	}
 }
