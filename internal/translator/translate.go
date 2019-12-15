@@ -17,6 +17,8 @@ package translator
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	irv1beta1 "github.com/projectcontour/contour/apis/contour/v1beta1"
 	hpv1 "github.com/projectcontour/contour/apis/projectcontour/v1"
@@ -31,11 +33,30 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 
 	// TODO(youngnick): Investigate if we should skip logically empty IngressRoutes
 
+	var routeLCP string
+	var warnings []string
+
 	if ir.Spec.VirtualHost == nil {
-		return nil, nil, errors.New("unimplemented: Can't translate non-root IngressRoutes yet")
+		routePrefixes := extractPrefixes(ir.Spec.Routes)
+		routeLCP = longestCommonPathPrefix(routePrefixes)
+		if routeLCP == "" && len(routePrefixes) > 1 {
+			// There are no common prefixes here.
+			return nil, nil, errors.New("invalid IngressRoute: match clauses must share a common prefix")
+		}
+		if len(routePrefixes) == 1 && routePrefixes[0] != "/" {
+			warnings = append(warnings, fmt.Sprintf("Can't determine include path from single match %s. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/master/httpproxy/#conditions-and-inclusion", routePrefixes[0]))
+			// Reset the largest common prefix back to '/', since we can't replace it.
+			routeLCP = ""
+		}
+		if routeLCP != "" {
+			warnings = append(warnings, fmt.Sprintf("The guess for the IngressRoute include path is %s. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/master/httpproxy/#conditions-and-inclusion", routeLCP))
+		}
+
 	}
 
-	routes, includes, warnings := translateRoutes(ir.Spec.Routes)
+	routes, includes, translateWarnings := translateRoutes(ir.Spec.Routes, routeLCP)
+
+	warnings = append(warnings, translateWarnings...)
 
 	hp := &hpv1.HTTPProxy{
 		TypeMeta: v1.TypeMeta{
@@ -59,20 +80,27 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 			Includes:    includes,
 		},
 	}
-
 	return hp, warnings, nil
 }
 
-func translateRoute(irRoute irv1beta1.Route) (hpv1.Route, []string) {
+func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []string) {
+
 	var warnings []string
 
 	route := hpv1.Route{
 		Conditions: []hpv1.Condition{
-			hpv1.Condition{
-				Prefix: irRoute.Match,
-			},
+			hpv1.Condition{},
 		},
 	}
+
+	// If we've been passed a largest common prefix for all the routes, trim it
+	// off the Match.
+	// Note that the empty string for routeLCP here means "no prefix".
+	match := irRoute.Match
+	if routeLCP != "" {
+		match = strings.TrimPrefix(match, routeLCP)
+	}
+	route.Conditions[0].Prefix = match
 
 	if irRoute.TimeoutPolicy != nil {
 		route.TimeoutPolicy = &hpv1.TimeoutPolicy{
@@ -146,7 +174,7 @@ func translateInclude(irRoute irv1beta1.Route) *hpv1.Include {
 	}
 }
 
-func translateRoutes(irRoutes []irv1beta1.Route) ([]hpv1.Route, []hpv1.Include, []string) {
+func translateRoutes(irRoutes []irv1beta1.Route, routeLCP string) ([]hpv1.Route, []hpv1.Include, []string) {
 
 	var routes []hpv1.Route
 	var includes []hpv1.Include
@@ -157,10 +185,78 @@ func translateRoutes(irRoutes []irv1beta1.Route) ([]hpv1.Route, []hpv1.Include, 
 			includes = append(includes, *hpInclude)
 			continue
 		}
-		route, translationWarnings := translateRoute(irRoute)
+		route, translationWarnings := translateRoute(irRoute, routeLCP)
 		routes = append(routes, route)
 		warnings = append(warnings, translationWarnings...)
 	}
 
 	return routes, includes, warnings
+}
+
+func extractPrefixes(routes []irv1beta1.Route) []string {
+
+	var prefixes []string
+	for _, route := range routes {
+		prefixes = append(prefixes, route.Match)
+	}
+
+	return prefixes
+}
+
+// longestCommonPathPrefix finds the longest common path prefix by
+// splitting a set of strings that give path prefixes on `/` characters,
+// then checking which match.
+// The empty string means that there is no common path prefix.
+func longestCommonPathPrefix(paths []string) string {
+
+	if len(paths) == 0 {
+		return ""
+	}
+
+	if len(paths) == 1 {
+		if paths[0] == "" || paths[0] == "/" {
+			return ""
+		}
+		return paths[0]
+	}
+
+	if !sort.StringsAreSorted(paths) {
+		sort.Strings(paths)
+	}
+
+	// Build a two-dimensional array of paths split by "/"
+	// the first element of pathElements will be the shortest path
+	pathElements := make([][]string, len(paths))
+	for index, path := range paths {
+		// Split the first '/' off, to remove the zero-length
+		// string that would otherwise be the first element.
+		if path[0] == '/' {
+			path = path[1:]
+		}
+		pathElements[index] = strings.Split(path, "/")
+	}
+
+	// Next, for each element in the shortest path,
+	// check if all the elements in that position in the other
+	// paths match. If so, it's common, add it.
+	// If not, that's it, break.
+	var longestPrefix []string
+
+OuterLoop:
+	for index, pathElement := range pathElements[0] {
+		for _, pathSlice := range pathElements[1:] {
+			if pathSlice[index] != pathElement {
+				break OuterLoop
+			}
+		}
+		longestPrefix = append(longestPrefix, pathElement)
+	}
+
+	// If there isn't any longest prefix, just return "/"
+	if len(longestPrefix) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("/%s", strings.Join(longestPrefix, "/"))
+
 }

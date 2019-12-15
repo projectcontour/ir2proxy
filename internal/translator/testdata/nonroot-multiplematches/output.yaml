@@ -1,0 +1,19 @@
+---
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: nonroot-slash-match
+  namespace: default
+spec:
+  routes:
+  - conditions:
+    - prefix: /bar
+    services:
+    - name: s1
+      port: 80
+  - conditions:
+    - prefix: /baz
+    services:
+    - name: s1
+      port: 80
+status: {}
