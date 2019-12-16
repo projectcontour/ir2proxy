@@ -25,7 +25,7 @@ func main() {
 func run() int {
 
 	log := logrus.StandardLogger()
-	app := kingpin.New("ir2proxy", "Contour IngressRoute to HTTPPRoxy conversion tool.")
+	app := kingpin.New("ir2proxy", "Contour IngressRoute to HTTPProxy conversion tool.")
 
 	yamlfile := app.Arg("yaml", "YAML file to parse for IngressRoute objects").Required().ExistingFile()
 
