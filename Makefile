@@ -44,7 +44,8 @@ race:
 download: ## Download Go modules
 	go mod download
 
-.PHONY: check-test
+.PHONY: check-test test
+test: check-test
 check-test:
 	go test -cover -mod=readonly $(MODULE)/...
 

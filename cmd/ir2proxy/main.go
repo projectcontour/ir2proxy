@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/ghodss/yaml"
 
@@ -70,10 +71,19 @@ func run() int {
 		// so filter it out.
 		// See https://github.com/projectcontour/ir2proxy/issues/8 for more explanation here.
 		outputYAML = bytes.ReplaceAll(outputYAML, []byte("  creationTimestamp: null\n"), []byte(""))
-		fmt.Printf("---\n%s", outputYAML)
+		outputWarnings := commentedWarnings(warnings)
+		fmt.Printf("---\n%s%s", outputWarnings, outputYAML)
 	}
 
 	return 0
+}
+
+func commentedWarnings(warnings []string) string {
+	for index, warning := range warnings {
+		warnings[index] = "# " + strings.ReplaceAll(warning, ". ", ".\n# ")
+	}
+	return strings.Join(warnings, "\n")
+
 }
 
 func splitYAML(yamldata []byte) [][]byte {
