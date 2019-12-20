@@ -35,3 +35,36 @@ status:
 ## Installation
 
 Go to the [releases](https://github.com/projectcontour/ir2proxy/releases) page and download the latest version.
+
+## Possible conversion problems and what to do about them
+
+### Prefix behavior in IngressRoute vs HTTPProxy
+
+In IngressRoute, delegation was a route-level construct, that required that the delegated IngressRoutes have the full prefix, including the delegation prefix.
+So a nonroot Ingressroute that wanted to accept traffic for `/foo/bar` would have a `match` entry of `/foo/bar`.
+
+For HTTPProxy, inclusion is a top-level construct, and the included HTTPProxy does *not* need to have the full prefix, and can be included at multiple paths if required.
+So a nonroot HTTPProxy that wanted to accept traffic for `/foo/bar` would have a `prefix` `condition` of `/bar`, and be included using a `prefix` `condition` of `/foo`.
+
+`ir2proxy` tries to guess what the prefix should be, and puts its guess into generated nonroot HTTPProxy objects.
+It will warn you on stderr and in the generated file what its guess means if it's not sure.
+(For some specific cases, the tool can be sure what you mean.)
+
+### Load Balancing Strategy
+
+In IngressRoute, setting the load balancing strategy was originally designed as a route-level default that could be overwritten by a service-level setting.
+However, only the service-level setting was implemented.
+
+HTTPProxy currently only has the route-level setting implemented, so `ir2proxy` will take the first setting of `strategy` in IngressRoute to be the correct setting for HTTPProxy.
+
+A warning will be output to stderr and as a comment in the file.
+
+### Healthchecks
+
+In IngressRoute, healthchecks were only configurable at a service level, not defaulted at a route level.
+
+In HTTPProxy, healtchchecks are only configurable at a route level.
+Accordingly, `ir2proxy` will take overwrite the healthcheck found and record it at the HTTPProxy Route level.
+This means that for multiple healthchecks, the last will take precedence.
+
+No warning will be output in this case. This will be fixed, see #31.
