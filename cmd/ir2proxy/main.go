@@ -16,6 +16,8 @@ import (
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
+var build = "devel"
+
 func main() {
 
 	exitcode := run()
@@ -27,7 +29,7 @@ func run() int {
 
 	log := logrus.StandardLogger()
 	app := kingpin.New("ir2proxy", "Contour IngressRoute to HTTPProxy conversion tool.")
-
+	app.Version(build)
 	yamlfile := app.Arg("yaml", "YAML file to parse for IngressRoute objects").Required().ExistingFile()
 
 	args := os.Args[1:]
