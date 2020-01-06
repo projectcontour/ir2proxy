@@ -11,7 +11,7 @@ import (
 )
 
 func TestCheckIngressRoute(t *testing.T) {
-	for name, tc := range buildFixtureSet() {
+	for name, tc := range buildFixtureSet(t) {
 		t.Run(name, func(t *testing.T) {
 			ir, _ := k8sdecoder.DecodeIngressRoute(tc.input)
 			warnings := CheckIngressRoute(ir)
@@ -28,10 +28,10 @@ type testFixture struct {
 	want  []string
 }
 
-func buildFixtureSet() map[string]testFixture {
+func buildFixtureSet(t *testing.T) map[string]testFixture {
 	testdataFiles, err := ioutil.ReadDir("testdata")
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	newFixtures := make(map[string]testFixture)
 	for _, fileinfo := range testdataFiles {
@@ -41,12 +41,12 @@ func buildFixtureSet() map[string]testFixture {
 
 		inputdata, err := ioutil.ReadFile(fmt.Sprintf("testdata/%s/input.yaml", fileinfo.Name()))
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		errordata, err := ioutil.ReadFile(fmt.Sprintf("testdata/%s/errors.txt", fileinfo.Name()))
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		trimerrordata := strings.TrimSpace(string(errordata))
