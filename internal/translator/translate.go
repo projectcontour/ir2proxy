@@ -119,6 +119,7 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 	}
 
 	var seenLBStrategy string
+	var seenHealthCheckPolicy string
 	for _, irService := range irRoute.Services {
 
 		service := hpv1.Service{
@@ -129,9 +130,9 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 
 		if irService.Strategy != "" {
 			if seenLBStrategy == "" {
-				seenLBStrategy = irService.Strategy
 				// Copy the first strategy we encounter into the HP loadbalancerpolicy
 				// and save that we've seen that one.
+				seenLBStrategy = irService.Strategy
 				route.LoadBalancerPolicy = &hpv1.LoadBalancerPolicy{
 					Strategy: irService.Strategy,
 				}
@@ -143,12 +144,21 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 
 		}
 		if irService.HealthCheck != nil {
-			route.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
-				Path:                    irService.HealthCheck.Path,
-				Host:                    irService.HealthCheck.Host,
-				TimeoutSeconds:          irService.HealthCheck.TimeoutSeconds,
-				UnhealthyThresholdCount: irService.HealthCheck.UnhealthyThresholdCount,
-				HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
+			if seenHealthCheckPolicy == "" {
+				// Copy the first strategy we encounter into the HP loadbalancerpolicy
+				// and save that we've seen that one.
+				seenHealthCheckPolicy = irService.HealthCheck.Host + irService.HealthCheck.Path
+				route.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
+					Path:                    irService.HealthCheck.Path,
+					Host:                    irService.HealthCheck.Host,
+					TimeoutSeconds:          irService.HealthCheck.TimeoutSeconds,
+					UnhealthyThresholdCount: irService.HealthCheck.UnhealthyThresholdCount,
+					HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
+				}
+			} else {
+				if seenHealthCheckPolicy != irService.HealthCheck.Host+irService.HealthCheck.Path {
+					warnings = append(warnings, fmt.Sprintf("A healthcheck of %s%s could not be applied, HTTPProxy only supports a single healthcheck across all services. %s is already applied.", irService.HealthCheck.Host, irService.HealthCheck.Path, seenHealthCheckPolicy))
+				}
 			}
 		}
 		route.Services = append(route.Services, service)

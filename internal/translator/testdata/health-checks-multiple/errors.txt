@@ -1,0 +1,1 @@
+A healthcheck of /healthy2 could not be applied, HTTPProxy only supports a single healthcheck across all services. /healthy is already applied.
