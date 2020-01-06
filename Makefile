@@ -7,13 +7,7 @@ SRCDIRS := ./cmd
 
 TAG_LATEST ?= false
 
-# Sets GIT_REF to a tag if it's present, otherwise the short rev.
-GIT_REF = $(shell git describe --tags || git rev-parse --short=8 --verify HEAD)
-VERSION ?= $(GIT_REF)
-# Used for the tag-latest action.
-# The tag-latest action will be a noop unless this is explicitly
-# set outside this Makefile, as a safety valve.
-LATEST_VERSION ?= NOLATEST
+GIT_REF := $(shell git rev-parse --short=8 --verify HEAD)
 
 export GO111MODULE=on
 
@@ -36,10 +30,10 @@ check: install $(Check_Targets) ## Run tests and CI checks
 pedantic: check check-errcheck ## Run pedantic CI checks
 
 install: ## Build and install the contour binary
-	go install -mod=readonly -v $(MODULE)/cmd/$(PROJECT)
+	go install -mod=readonly -v -ldflags="-X main.build=$(GIT_REF)" $(MODULE)/cmd/$(PROJECT)
 
 race:
-	go install -mod=readonly -v $(MODULE)/cmd/$(PROJECT)
+	go install -mod=readonly -ldflags="-X main.build=$(GIT_REF)" g-v $(MODULE)/cmd/$(PROJECT)
 
 download: ## Download Go modules
 	go mod download

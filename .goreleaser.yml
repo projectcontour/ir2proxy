@@ -5,6 +5,9 @@ builds:
   flags:
   - -mod=readonly
   - -v
+  # Sets the version to the goreleaser one.
+  ldflags:
+  - -X main.build={{.Version}}
   goos:
   - windows
   - linux
