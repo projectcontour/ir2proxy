@@ -1,1 +1,1 @@
-A healthcheck of /healthy2 could not be applied, HTTPProxy only supports a single healthcheck across all services. /healthy is already applied.
+A healthcheck on service s2-health could not be applied, HTTPProxy only supports a single healthcheck across all services. A different healthcheck from service s1-health is already applied.

@@ -119,7 +119,8 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 	}
 
 	var seenLBStrategy string
-	var seenHealthCheckPolicy string
+	var seenHealthCheckPolicy *irv1beta1.HealthCheck
+	var seenHealthCheckServiceName string
 	for _, irService := range irRoute.Services {
 
 		service := hpv1.Service{
@@ -144,10 +145,11 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 
 		}
 		if irService.HealthCheck != nil {
-			if seenHealthCheckPolicy == "" {
-				// Copy the first strategy we encounter into the HP loadbalancerpolicy
+			if seenHealthCheckPolicy == nil {
+				// Copy the first strategy we encounter into the HP HealthCheckPolicy
 				// and save that we've seen that one.
-				seenHealthCheckPolicy = irService.HealthCheck.Host + irService.HealthCheck.Path
+				seenHealthCheckPolicy = irService.HealthCheck
+				seenHealthCheckServiceName = irService.Name
 				route.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
 					Path:                    irService.HealthCheck.Path,
 					Host:                    irService.HealthCheck.Host,
@@ -156,9 +158,7 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 					HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
 				}
 			} else {
-				if seenHealthCheckPolicy != irService.HealthCheck.Host+irService.HealthCheck.Path {
-					warnings = append(warnings, fmt.Sprintf("A healthcheck of %s%s could not be applied, HTTPProxy only supports a single healthcheck across all services. %s is already applied.", irService.HealthCheck.Host, irService.HealthCheck.Path, seenHealthCheckPolicy))
-				}
+				warnings = append(warnings, fmt.Sprintf("A healthcheck on service %s could not be applied, HTTPProxy only supports a single healthcheck across all services. A different healthcheck from service %s is already applied.", irService.Name, seenHealthCheckServiceName))
 			}
 		}
 		route.Services = append(route.Services, service)
