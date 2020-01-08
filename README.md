@@ -2,6 +2,12 @@
 
 ir2proxy is a tool to convert ir2proxy's IngressRoute resources to HTTPProxy resources.
 
+## Features
+
+ir2proxy can translate an IngressRoute object to a HTTPProxy object.
+The full featureset of IngressRoute should be translated correctly.
+If not, please [log an issue](https://github.com/projectcontour/ir2proxy/issues), specifying what didn't work and supplying the sanitized IngressRoute YAML.
+
 ## Usage
 
 `ir2proxy` is intended for taking a yaml file containing one or more valid IngressRoute objects, and then outputting translated HTTPProxy objects to stdout.
@@ -27,16 +33,38 @@ spec:
       port: 80
   virtualhost:
     fqdn: foo-basic.bar.com
-status:
-  currentStatus: ""
-  description: ""
+status: {}
 ```
+
+It's intended mode of operation is in a one-file-at-a-time manner, so it's easier to use it in a Unix pipe.
 
 ## Installation
 
+### Homebrew
+
+Add the `ir2proxy` tap (located at [homebrew-ir2proxy](https://github.com/projectcontour/homebrew-ir2proxy)):
+
+```sh
+brew tap projectcontour/ir2proxy
+```
+
+Then install ir2proxy:
+
+```sh
+brew install ir2proxy
+```
+
+To upgrade, use
+
+```sh
+brew upgrade ir2proxy
+```
+
+### Non-homebrew
+
 Go to the [releases](https://github.com/projectcontour/ir2proxy/releases) page and download the latest version.
 
-## Possible conversion problems and what to do about them
+## Possible issues with conversion and what to do about them
 
 ### Prefix behavior in IngressRoute vs HTTPProxy
 
@@ -67,4 +95,4 @@ In HTTPProxy, healtchchecks are only configurable at a route level.
 Accordingly, `ir2proxy` will take overwrite the healthcheck found and record it at the HTTPProxy Route level.
 This means that for multiple healthchecks, the last will take precedence.
 
-No warning will be output in this case. This will be fixed, see #31.
+A warning will be output to stderr and as a comment in the file.
