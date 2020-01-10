@@ -109,7 +109,7 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 	}
 
 	if irRoute.PrefixRewrite != "" {
-		route.PathRewrite = &hpv1.PathRewritePolicy{
+		route.PathRewritePolicy = &hpv1.PathRewritePolicy{
 			ReplacePrefix: []hpv1.ReplacePrefix{
 				hpv1.ReplacePrefix{
 					Replacement: irRoute.PrefixRewrite,
