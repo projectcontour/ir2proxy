@@ -122,6 +122,45 @@ spec:
 `),
 			want: []string{"invalid IngressRoute: match clauses must share a common prefix"},
 		},
+		"tcpproxy IR, not root": {
+			input: []byte(`
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: nonroot-tcpproxy
+  namespace: default
+spec:
+  tcpproxy:
+     services:
+     - name: s1
+       port: 80
+`),
+			want: []string{"invalid IngressRoute: tcpproxy must be in a root IngressRoute"},
+		},
+		"tcpproxy IR, delegate and services set": {
+			input: []byte(`
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: nonroot-tcpproxy
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: "tcpproxy-test.domain.com"
+    tls:
+      secretName: "secret"
+  tcpproxy:
+    delegate:
+      name: bad
+      namespace: default
+    services:
+      - name: s1
+        port: 80
+`),
+			want: []string{"invalid IngressRoute: Delegate and Services can not both be set"},
+		},
 	}
 
 	for name, tc := range tests {
