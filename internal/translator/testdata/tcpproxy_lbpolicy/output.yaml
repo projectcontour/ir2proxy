@@ -1,0 +1,17 @@
+---
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: tcpproxy-test
+spec:
+  tcpproxy:
+    loadBalancerPolicy:
+      strategy: WeightedLeastRequest
+    services:
+    - name: s1
+      port: 80
+  virtualhost:
+    fqdn: tcpproxy-test.domain.com
+    tls:
+      secretName: secret
+status: {}
