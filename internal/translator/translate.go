@@ -36,6 +36,28 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 	var routeLCP string
 	var warnings []string
 
+	var tcpproxy *hpv1.TCPProxy
+
+	var includes []hpv1.Include
+
+	if ir.Spec.TCPProxy != nil {
+		if ir.Spec.VirtualHost == nil {
+			return nil, nil, errors.New("invalid IngressRoute: tcpproxy must be in a root IngressRoute")
+		}
+
+		// The compiler won't use the outer tcpproxy correctly if we
+		// use := here.
+		var tcpincludes []hpv1.Include
+		var err error
+		var tcpwarnings []string
+		tcpproxy, tcpincludes, tcpwarnings, err = translateTCPProxy(ir.Spec.TCPProxy)
+		if err != nil {
+			return nil, nil, err
+		}
+		includes = append(includes, tcpincludes...)
+		warnings = append(warnings, tcpwarnings...)
+	}
+
 	if ir.Spec.VirtualHost == nil {
 		routePrefixes := extractPrefixes(ir.Spec.Routes)
 		routeLCP = longestCommonPathPrefix(routePrefixes)
@@ -54,8 +76,8 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 
 	}
 
-	routes, includes, translateWarnings := translateRoutes(ir.Spec.Routes, routeLCP)
-
+	routes, routeIncludes, translateWarnings := translateRoutes(ir.Spec.Routes, routeLCP)
+	includes = append(includes, routeIncludes...)
 	warnings = append(warnings, translateWarnings...)
 
 	hp := &hpv1.HTTPProxy{
@@ -78,8 +100,10 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 			VirtualHost: ir.Spec.VirtualHost,
 			Routes:      routes,
 			Includes:    includes,
+			TCPProxy:    tcpproxy,
 		},
 	}
+
 	return hp, warnings, nil
 }
 
@@ -123,48 +147,66 @@ func translateRoute(irRoute irv1beta1.Route, routeLCP string) (hpv1.Route, []str
 	var seenHealthCheckServiceName string
 	for _, irService := range irRoute.Services {
 
-		service := hpv1.Service{
-			Name:   irService.Name,
-			Port:   irService.Port,
-			Weight: irService.Weight,
-		}
+		service, healthcheckPolicy, lbpolicy := translateService(irService)
 
-		if irService.Strategy != "" {
+		if lbpolicy != nil {
 			if seenLBStrategy == "" {
 				// Copy the first strategy we encounter into the HP loadbalancerpolicy
 				// and save that we've seen that one.
 				seenLBStrategy = irService.Strategy
-				route.LoadBalancerPolicy = &hpv1.LoadBalancerPolicy{
-					Strategy: irService.Strategy,
-				}
+				route.LoadBalancerPolicy = lbpolicy
 			} else {
 				if seenLBStrategy != irService.Strategy {
 					warnings = append(warnings, fmt.Sprintf("Strategy %s on Service %s could not be applied, HTTPProxy only supports a single load balancing policy across all services. %s is already applied.", irService.Strategy, irService.Name, seenLBStrategy))
 				}
 			}
-
 		}
-		if irService.HealthCheck != nil {
+
+		if healthcheckPolicy != nil {
 			if seenHealthCheckPolicy == nil {
 				// Copy the first strategy we encounter into the HP HealthCheckPolicy
 				// and save that we've seen that one.
 				seenHealthCheckPolicy = irService.HealthCheck
 				seenHealthCheckServiceName = irService.Name
-				route.HealthCheckPolicy = &hpv1.HTTPHealthCheckPolicy{
-					Path:                    irService.HealthCheck.Path,
-					Host:                    irService.HealthCheck.Host,
-					TimeoutSeconds:          irService.HealthCheck.TimeoutSeconds,
-					UnhealthyThresholdCount: irService.HealthCheck.UnhealthyThresholdCount,
-					HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
-				}
+				route.HealthCheckPolicy = healthcheckPolicy
 			} else {
 				warnings = append(warnings, fmt.Sprintf("A healthcheck on service %s could not be applied, HTTPProxy only supports a single healthcheck across all services. A different healthcheck from service %s is already applied.", irService.Name, seenHealthCheckServiceName))
 			}
 		}
+
 		route.Services = append(route.Services, service)
 	}
 
 	return route, warnings
+}
+
+func translateService(irService irv1beta1.Service) (hpv1.Service, *hpv1.HTTPHealthCheckPolicy, *hpv1.LoadBalancerPolicy) {
+	service := hpv1.Service{
+		Name:   irService.Name,
+		Port:   irService.Port,
+		Weight: irService.Weight,
+	}
+
+	var healthcheckPolicy *hpv1.HTTPHealthCheckPolicy
+	var lbpolicy *hpv1.LoadBalancerPolicy
+
+	if irService.Strategy != "" {
+		lbpolicy = &hpv1.LoadBalancerPolicy{
+			Strategy: irService.Strategy,
+		}
+	}
+
+	if irService.HealthCheck != nil {
+		healthcheckPolicy = &hpv1.HTTPHealthCheckPolicy{
+			Path:                    irService.HealthCheck.Path,
+			Host:                    irService.HealthCheck.Host,
+			TimeoutSeconds:          irService.HealthCheck.TimeoutSeconds,
+			UnhealthyThresholdCount: irService.HealthCheck.UnhealthyThresholdCount,
+			HealthyThresholdCount:   irService.HealthCheck.HealthyThresholdCount,
+		}
+	}
+
+	return service, healthcheckPolicy, lbpolicy
 }
 
 func translateInclude(irRoute irv1beta1.Route) *hpv1.Include {
@@ -201,6 +243,39 @@ func translateRoutes(irRoutes []irv1beta1.Route, routeLCP string) ([]hpv1.Route,
 	}
 
 	return routes, includes, warnings
+}
+
+func translateTCPProxy(irTCPProxy *irv1beta1.TCPProxy) (*hpv1.TCPProxy, []hpv1.Include, []string, error) {
+
+	var includes []hpv1.Include
+	var warnings []string
+
+	if irTCPProxy.Delegate != nil {
+		if len(irTCPProxy.Services) > 0 {
+			return nil, includes, warnings, errors.New("invalid IngressRoute: Delegate and Services can not both be set")
+		}
+		includes = append(includes, hpv1.Include{
+			Name:      irTCPProxy.Delegate.Name,
+			Namespace: irTCPProxy.Delegate.Namespace,
+		})
+		return nil, includes, warnings, nil
+	}
+
+	proxy := &hpv1.TCPProxy{}
+	for _, irService := range irTCPProxy.Services {
+
+		hpService, healthcheckPolicy, lbpolicy := translateService(irService)
+
+		if healthcheckPolicy != nil {
+			warnings = append(warnings, "Healthcheck policy of TCPProxy service has no effect, discarding")
+		}
+
+		if lbpolicy != nil {
+			proxy.LoadBalancerPolicy = lbpolicy
+		}
+		proxy.Services = append(proxy.Services, hpService)
+	}
+	return proxy, includes, warnings, nil
 }
 
 func extractPrefixes(routes []irv1beta1.Route) []string {
