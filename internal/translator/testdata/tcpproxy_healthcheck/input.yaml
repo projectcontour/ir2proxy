@@ -1,0 +1,20 @@
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: tcpproxy-test
+spec:
+  virtualhost:
+    fqdn: "tcpproxy-test.domain.com"
+    tls:
+      secretName: "secret"
+  tcpproxy:
+    services:
+    - name: s1
+      port: 80
+      healthCheck:
+        path: /healthy
+        intervalSeconds: 5
+        timeoutSeconds: 2
+        unhealthyThresholdCount: 3
+        healthyThresholdCount: 5

@@ -1,0 +1,14 @@
+---
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: tcpproxy-test
+spec:
+  includes:
+  - name: delegate
+    namespace: default
+  virtualhost:
+    fqdn: tcpproxy-test.domain.com
+    tls:
+      secretName: secret
+status: {}

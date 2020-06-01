@@ -1,0 +1,14 @@
+---
+apiVersion: contour.heptio.com/v1beta1
+kind: IngressRoute
+metadata:
+  name: tcpproxy-test
+spec:
+  virtualhost:
+    fqdn: "tcpproxy-test.domain.com"
+    tls:
+      secretName: "secret"
+  tcpproxy:
+    delegate:
+      name: delegate
+      namespace: default
