@@ -13,3 +13,6 @@
 
 # Goreleaser working directory
 dist/**
+
+# IDE
+.idea/
