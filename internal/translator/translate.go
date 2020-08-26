@@ -66,12 +66,12 @@ func IngressRouteToHTTPProxy(ir *irv1beta1.IngressRoute) (*hpv1.HTTPProxy, []str
 			return nil, nil, errors.New("invalid IngressRoute: match clauses must share a common prefix")
 		}
 		if len(routePrefixes) == 1 && routePrefixes[0] != "/" {
-			warnings = append(warnings, fmt.Sprintf("Can't determine include path from single match %s. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/master/httpproxy/#conditions-and-inclusion", routePrefixes[0]))
+			warnings = append(warnings, fmt.Sprintf("Can't determine include path from single match %s. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/main/httpproxy/#conditions-and-inclusion", routePrefixes[0]))
 			// Reset the largest common prefix back to '/', since we can't replace it.
 			routeLCP = ""
 		}
 		if routeLCP != "" {
-			warnings = append(warnings, fmt.Sprintf("The guess for the IngressRoute include path is %s. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/master/httpproxy/#conditions-and-inclusion", routeLCP))
+			warnings = append(warnings, fmt.Sprintf("The guess for the IngressRoute include path is %s. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/main/httpproxy/#conditions-and-inclusion", routeLCP))
 		}
 
 	}
