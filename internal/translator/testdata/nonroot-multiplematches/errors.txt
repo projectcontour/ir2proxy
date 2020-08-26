@@ -1,1 +1,1 @@
-The guess for the IngressRoute include path is /foo. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/master/httpproxy/#conditions-and-inclusion
+The guess for the IngressRoute include path is /foo. HTTPProxy prefix conditions should not include the include prefix. Please check this value is correct. See https://projectcontour.io/docs/main/httpproxy/#conditions-and-inclusion

@@ -19,7 +19,7 @@ This section describes how to build ir2proxy from source.
 
 ir2proxy uses [`go modules`][2] for dependency management. 
 
-In order to make PRs, however, you'll need to make your own fork of the ir2proxy repo. A suggestion on how to do that is below, which will place the code in your `$GOPATH` and set you up so you can `git pull` on master and get the upstream master.
+In order to make PRs, however, you'll need to make your own fork of the ir2proxy repo. A suggestion on how to do that is below, which will place the code in your `$GOPATH` and set you up so you can `git pull` on main and get the upstream main.
 
 #### Source setup suggestion
 
@@ -92,8 +92,8 @@ tend to squash before opening the PR, then have PR feedback as
 extra commits.
 - Do not merge commits that don't relate to the affected issue (e.g. "Updating from PR comments", etc). Should
 the need to cherrypick a commit or rollback arise, it should be clear what a specific commit's purpose is.
-- If master has moved on, you'll need to rebase before we can merge,
-so merging upstream master or rebasing from upstream before opening your
+- If main has moved on, you'll need to rebase before we can merge,
+so merging upstream main or rebasing from upstream before opening your
 PR will probably save you some time.
 - PRs *must* include a `Fixes #NNNN` or `Updates #NNNN` comment. Remember that
 `Fixes` will close the associated issue, and `Updates` will link the PR to it.
