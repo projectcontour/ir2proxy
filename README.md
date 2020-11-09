@@ -1,10 +1,10 @@
 # ir2proxy [![Build Status](https://travis-ci.com/projectcontour/ir2proxy.svg?branch=main)](https://travis-ci.com/projectcontour/ir2proxy) [![Go Report Card](https://goreportcard.com/badge/github.com/projectcontour/ir2proxy)](https://goreportcard.com/report/github.com/projectcontour/ir2proxy) ![GitHub release](https://img.shields.io/github/release/projectcontour/ir2proxy.svg) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-ir2proxy is a tool to convert ir2proxy's IngressRoute resources to HTTPProxy resources.
+ir2proxy is a tool to convert Contour's IngressRoute resources to HTTPProxy resources.
 
 ## Features
 
-ir2proxy can translate an IngressRoute object to a HTTPProxy object.
+ir2proxy can translate an IngressRoute object to an HTTPProxy object.
 The full featureset of IngressRoute should be translated correctly.
 If not, please [log an issue](https://github.com/projectcontour/ir2proxy/issues), specifying what didn't work and supplying the sanitized IngressRoute YAML.
 
@@ -36,7 +36,7 @@ spec:
 status: {}
 ```
 
-It's intended mode of operation is in a one-file-at-a-time manner, so it's easier to use it in a Unix pipe.
+Its intended mode of operation is in a one-file-at-a-time manner, so it's easier to use it in a Unix pipe.
 
 ## Installation
 
@@ -91,8 +91,8 @@ A warning will be output to stderr and as a comment in the file.
 
 In IngressRoute, healthchecks were only configurable at a service level, not defaulted at a route level.
 
-In HTTPProxy, healtchchecks are only configurable at a route level.
-Accordingly, `ir2proxy` will take overwrite the healthcheck found and record it at the HTTPProxy Route level.
+In HTTPProxy, healthchecks are only configurable at a route level.
+Accordingly, `ir2proxy` will take the healthcheck found and record it at the HTTPProxy Route level.
 This means that for multiple healthchecks, the last will take precedence.
 
 A warning will be output to stderr and as a comment in the file.
